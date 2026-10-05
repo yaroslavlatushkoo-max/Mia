@@ -35,6 +35,33 @@ class ToolSpec:
     status: str = "REAL"
     side_effects: List[str] = field(default_factory=list)
     timeout: int = 30
+    # Declared parameter aliases: canonical_name -> list of accepted synonyms.
+    # Part of the tool contract (schema <-> planner <-> registry <-> adapter),
+    # so legacy/LLM synonyms resolve deterministically instead of crashing.
+    aliases: Dict[str, List[str]] = field(default_factory=dict)
+
+    def normalize_input(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Map alias parameters to canonical names and drop unknown ones.
+
+        Canonical names come from input_schema.properties plus explicit
+        aliases. Unknown keys are removed (they would crash the executor);
+        missing-required detection stays in validate_input().
+        """
+        props = (self.input_schema or {}).get("properties", {})
+        reverse = {}
+        for canonical, syns in self.aliases.items():
+            for s in syns:
+                reverse[s] = canonical
+        out: Dict[str, Any] = {}
+        for key, value in kwargs.items():
+            if key in props:
+                out[key] = value
+            elif key in reverse:
+                canonical = reverse[key]
+                if canonical not in out:
+                    out[canonical] = value
+            # else: unknown param -> dropped, never forwarded to executor
+        return out
 
     def validate_input(self, kwargs: Dict[str, Any]) -> Optional[str]:
         """Deterministic input validation against the declared schema.
@@ -87,6 +114,10 @@ class ToolSpec:
                 error=f"Tool {self.name} has no executor",
                 verified=False,
             )
+        # Normalize declared aliases / drop unknown params BEFORE validation,
+        # so the whole chain (schema <-> planner <-> registry <-> adapter)
+        # speaks one canonical contract.
+        kwargs = self.normalize_input(kwargs)
         validation_error = self.validate_input(kwargs)
         if validation_error:
             return ToolResult(success=False, error=validation_error, verified=False)
