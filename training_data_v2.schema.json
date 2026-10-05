@@ -1,0 +1,22 @@
+{
+  "record": {
+    "id": "integer",
+    "instruction": "string",
+    "input": "string",
+    "output": "string",
+    "tags": "string[]",
+    "mode": "ASSISTANT|COMPANION|MIXED|TECHNICAL|AGENT",
+    "intent": "string",
+    "complexity": "0..4",
+    "estimated_tokens": {
+      "input": "integer",
+      "output": "integer",
+      "reasoning_budget": "integer",
+      "total_budget": "integer"
+    },
+    "tool": "string|null",
+    "memory": "NONE|READ",
+    "decision": "KEEP|REWRITE",
+    "source": "string"
+  }
+}

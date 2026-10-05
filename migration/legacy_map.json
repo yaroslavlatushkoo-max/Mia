@@ -1,0 +1,32 @@
+{
+  "speech.stt": {
+    "status": "keep",
+    "new_location": "mia/speech/stt.py",
+    "notes": "usable"
+  },
+  "speech.tts": {
+    "status": "keep",
+    "new_location": "mia/speech/tts.py",
+    "notes": "needs normalization"
+  },
+  "skills.browser": {
+    "status": "adapt",
+    "new_location": "mia/adapters/browser_adapter.py",
+    "notes": "wrap as tool"
+  },
+  "skills.files": {
+    "status": "adapt",
+    "new_location": "mia/adapters/file_adapter.py",
+    "notes": "wrap as tool"
+  },
+  "memory.chroma": {
+    "status": "keep",
+    "new_location": "mia/memory/chroma_store.py",
+    "notes": "reuse store"
+  },
+  "main": {
+    "status": "replace_later",
+    "new_location": "mia/core/orchestrator.py",
+    "notes": "gradually remove routing logic"
+  }
+}
