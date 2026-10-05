@@ -85,8 +85,12 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="web.search",
-            description="Search the web for a query.",
+            description=(
+                "Search the web for a query. STUB: real search backend is "
+                "not connected yet; prefer browser.open with a Google search URL."
+            ),
             risk="low",
+            status="STUB",
             input_schema={
                 "type": "object",
                 "properties": {

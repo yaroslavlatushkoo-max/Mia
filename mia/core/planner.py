@@ -1,9 +1,24 @@
 from __future__ import annotations
 
+"""Planner — Fast Plan / Deep Plan over ToolRegistry capabilities.
+
+Per docs/CORE_MIGRATION.md §4: the LLM is an enhancement to planning,
+not the only source of truth; rule-based fallback must remain working.
+Capabilities always come from the ToolRegistry (single source of truth,
+§5) — never from a duplicated hardcoded list.
+"""
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .task_context import TaskContext
+
+# Intent -> default tool mapping for the deterministic rule-based path.
+INTENT_TOOL_MAP = {
+    "OPEN_APPLICATION": "system.open_app",
+    "WEB_SEARCH": "browser.open",
+    "TECHNICAL_TASK": "files.list",
+}
 
 
 @dataclass
@@ -20,10 +35,12 @@ class Plan:
     goal: str
     steps: List[PlanStep]
     success_criteria: List[str] = field(default_factory=list)
+    level: str = "fast"  # "fast" (C2-C3) | "deep" (C4-C5)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "goal": self.goal,
+            "level": self.level,
             "steps": [
                 {
                     "step_id": s.step_id,
@@ -38,27 +55,50 @@ class Plan:
         }
 
 
+def _search_url(query: str) -> str:
+    from urllib.parse import quote_plus
+
+    return "https://www.google.com/search?q=" + quote_plus(query.strip())
+
+
 class Planner:
-    def __init__(self, model_router=None):
+    def __init__(self, model_router=None, tool_registry=None):
         self.model_router = model_router
-        self.available_tools = [
-            "system.open_app",
-            "files.list",
-            "files.read",
-            "browser.open",
-            "web.search",
-        ]
+        # When no registry is provided the planner has NO tools and can
+        # only produce empty plans — this forces the single-source-of-truth
+        # wiring (Orchestrator passes the real registry).
+        self.tool_registry = tool_registry
 
+    # ------------------------------------------------------------------
+    def available_tools(self) -> List[str]:
+        if not self.tool_registry:
+            return []
+        return self.tool_registry.capability_names()
+
+    def _is_available(self, tool: Optional[str]) -> bool:
+        return bool(tool) and tool in self.available_tools()
+
+    # ------------------------------------------------------------------
     def create_plan(self, ctx: TaskContext) -> Plan:
-        if self.model_router:
-            llm_plan = self._try_llm_plan(ctx)
-            if llm_plan and llm_plan.steps:
-                return llm_plan
-        return self._rule_based_plan(ctx)
+        level = "deep" if ctx.complexity in {"C4", "C5"} else "fast"
 
-    def _try_llm_plan(self, ctx: TaskContext) -> Optional[Plan]:
+        if self.model_router:
+            llm_plan = self._try_llm_plan(ctx, level)
+            if llm_plan and llm_plan.steps:
+                llm_plan.level = level
+                return llm_plan
+        return self._rule_based_plan(ctx, level)
+
+    # ------------------------------------------------------------------
+    def _try_llm_plan(self, ctx: TaskContext, level: str) -> Optional[Plan]:
         try:
-            tools_desc = "\n".join([f"- {t}" for t in self.available_tools])
+            caps = self.tool_registry.capabilities() if self.tool_registry else []
+            if not caps:
+                return None
+            tools_desc = "\n".join(
+                [f"- {c['name']}: {c['description']} (risk={c['risk']})" for c in caps]
+            )
+            max_steps = 5 if level == "fast" else 8
 
             prompt = f"""Ты — планировщик задач для ИИ-ассистента Мии.
 
@@ -72,7 +112,7 @@ class Planner:
 
 Запрос пользователя: {ctx.raw_input}
 
-Создай план из 1-5 шагов. Ответь строго в формате:
+Создай план из 1-{max_steps} шагов. Ответь строго в формате:
 GOAL: <цель>
 STEP 1: <action> | <tool> | <input_json>
 STEP 2: ...
@@ -122,13 +162,14 @@ SUCCESS: <критерий успеха>"""
                     if tool == "browser.open":
                         url = input_data.get("url", "")
                         if "google.com" not in url:
-                            query = ctx.raw_input.replace(" ", "+")
-                            input_data["url"] = f"https://www.google.com/search?q={query}"
+                            input_data["url"] = _search_url(ctx.raw_input)
 
                     steps.append(PlanStep(
                         step_id=step_num,
                         action=action,
-                        tool=tool if tool in self.available_tools else None,
+                        # Keep unknown tools as explicit failed steps so
+                        # Verification sees them — never silently drop them.
+                        tool=tool,
                         input_data=input_data,
                         description=action
                     ))
@@ -137,60 +178,111 @@ SUCCESS: <критерий успеха>"""
 
         return Plan(goal=goal, steps=steps, success_criteria=success_criteria)
 
-    def _rule_based_plan(self, ctx: TaskContext) -> Plan:
+    # ------------------------------------------------------------------
+    def _rule_based_plan(self, ctx: TaskContext, level: str = "fast") -> Plan:
         if ctx.intent == "OPEN_APPLICATION":
+            app_name = ctx.entities.get("app_name", "")
             return Plan(
-                goal=f"Open application: {ctx.entities.get('app_name', 'unknown')}",
+                goal=f"Open application: {app_name or 'unknown'}",
                 steps=[PlanStep(
                     step_id=1,
                     action="open_application",
                     tool="system.open_app",
-                    input_data={"app_name": ctx.entities.get("app_name", "")},
+                    input_data={"app_name": app_name},
                     description="Open requested application"
                 )],
-                success_criteria=["Application open command executed"]
+                success_criteria=["Application actually launched"],
+                level=level,
             )
 
         if ctx.intent == "WEB_SEARCH":
-            query = ctx.raw_input
             return Plan(
-                goal=f"Search: {query}",
+                goal=f"Search: {ctx.raw_input}",
                 steps=[PlanStep(
                     step_id=1,
                     action="open_search",
                     tool="browser.open",
-                    input_data={"url": "https://www.google.com/search?q=" + query.replace(" ", "+")},
+                    input_data={"url": _search_url(ctx.raw_input)},
                     description="Open search page"
                 )],
-                success_criteria=["Search page opened"]
+                success_criteria=["Search page opened"],
+                level=level,
             )
 
         if ctx.intent == "TECHNICAL_TASK":
+            if level == "deep":
+                # Deep plan: inspect directory, then read the most
+                # relevant-looking file (deterministic skeleton; the LLM
+                # may replace it with a richer plan when available).
+                return Plan(
+                    goal=ctx.raw_input,
+                    steps=[
+                        PlanStep(1, "inspect_directory", "files.list", {"path": ".", "limit": 30}),
+                        PlanStep(2, "read_key_file", "files.read", {"path": "./main.py"}),
+                    ],
+                    success_criteria=["Directory inspected", "Relevant file content read"],
+                    level=level,
+                )
             return Plan(
                 goal=ctx.raw_input,
                 steps=[
                     PlanStep(1, "inspect_directory", "files.list", {"path": ".", "limit": 30}),
                 ],
-                success_criteria=["Directory inspected"]
+                success_criteria=["Directory inspected"],
+                level=level,
             )
 
-        return Plan(goal=ctx.raw_input, steps=[], success_criteria=[])
+        return Plan(goal=ctx.raw_input, steps=[], success_criteria=[], level=level)
 
+    # ------------------------------------------------------------------
     def replan(self, ctx: TaskContext, failed_plan: Plan, error: str) -> Plan:
-        new_steps = []
+        """Produce an alternative plan after a failure (bounded use).
+
+        Strategy: drop steps that failed for known reasons and substitute
+        a capability-backed alternative when possible.
+        """
+        available = set(self.available_tools())
+        new_steps: List[PlanStep] = []
 
         for step in failed_plan.steps:
-            if step.tool == "files.read" and "not found" in error.lower():
-                continue
-            new_steps.append(step)
+            keep = True
+            replacement: Optional[PlanStep] = None
+
+            # web.search is a stub at this migration stage — replace it
+            # with browser.open Google search when that capability exists.
+            if step.tool == "web.search" and "stub" in error.lower():
+                if "browser.open" in available:
+                    replacement = PlanStep(
+                        step_id=len(new_steps) + 1,
+                        action="open_search",
+                        tool="browser.open",
+                        input_data={"url": _search_url(step.input_data.get("query", ctx.raw_input))},
+                        description="Fallback: open Google search instead of stubbed web.search",
+                    )
+                keep = False
+
+            # Missing file for files.read — drop the read, keep listing.
+            if step.tool == "files.read" and ("does not exist" in error.lower() or "not found" in error.lower()):
+                keep = False
+
+            if keep:
+                new_steps.append(step)
+            elif replacement is not None:
+                new_steps.append(replacement)
+
+        # Reindex
+        for i, s in enumerate(new_steps, start=1):
+            s.step_id = i
 
         if not new_steps:
-            new_steps = [PlanStep(1, "fallback_search", "browser.open", {
-                "url": "https://www.google.com/search?q=" + ctx.raw_input.replace(" ", "+")
-            })]
+            if "browser.open" in available:
+                new_steps = [PlanStep(1, "fallback_search", "browser.open", {
+                    "url": _search_url(ctx.raw_input)
+                })]
 
         return Plan(
             goal=failed_plan.goal,
             steps=new_steps,
-            success_criteria=failed_plan.success_criteria
+            success_criteria=failed_plan.success_criteria,
+            level=failed_plan.level,
         )
