@@ -18,7 +18,11 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="system.open_app",
-            description="Open an application by name or path.",
+            description=(
+                "Open a Windows application by its name or executable path "
+                "(e.g. notepad, calc, msedge). ALWAYS use this tool to launch "
+                "installed applications; do NOT use browser.open for apps."
+            ),
             risk="medium",
             requires_confirmation=False,
             input_schema={
@@ -28,6 +32,7 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
                 },
                 "required": ["app_name"]
             },
+            aliases={"app_name": ["app", "application", "name"]},
             executor=lambda app_name: system.open_app(app_name),
         )
     )
@@ -44,6 +49,7 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
                     "limit": {"type": "integer"}
                 }
             },
+            aliases={"path": ["directory", "dir", "folder"]},
             executor=lambda path=".", limit=50: files.list_files(path, int(limit)),
         )
     )
@@ -61,6 +67,7 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
                 },
                 "required": ["path"]
             },
+            aliases={"path": ["file", "file_path"]},
             executor=lambda path, max_chars=4000: files.read_file(path, int(max_chars)),
         )
     )

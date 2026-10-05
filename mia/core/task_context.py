@@ -45,6 +45,20 @@ class TaskContext:
 
     risk: str = "low"
     requires_confirmation: bool = False
+    # HITL resume flag (migration To-do #1): set by Session when the user
+    # explicitly confirmed the pending task. Policy consumes it inside
+    # check_tool — confirmation is evaluated BY Policy, never around it.
+    confirmed: bool = False
+
+    # Execution budget flags (CORE_MIGRATION.md: CostEstimator output is
+    # carried in the context so Planner/AgentLoop read requirements from
+    # TaskContext instead of re-deriving them). Populated by
+    # CostEstimator.estimate(); defaults keep old constructions valid.
+    budget_requires_llm: bool = False
+    budget_requires_tool: bool = False
+    budget_requires_planner: bool = False
+    budget_confidence: float = 0.0
+    budget_reasons: list = field(default_factory=list)
 
     created_at: float = field(default_factory=time.time)
 
@@ -64,5 +78,11 @@ class TaskContext:
             "confidence": self.confidence,
             "risk": self.risk,
             "requires_confirmation": self.requires_confirmation,
+            "confirmed": self.confirmed,
+            "budget_requires_llm": self.budget_requires_llm,
+            "budget_requires_tool": self.budget_requires_tool,
+            "budget_requires_planner": self.budget_requires_planner,
+            "budget_confidence": self.budget_confidence,
+            "budget_reasons": list(self.budget_reasons),
             "created_at": self.created_at,
         }

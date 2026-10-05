@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List
+
 from .task_context import TaskContext
 
 
@@ -13,6 +15,13 @@ class ExecutionBudget:
     total_budget: int
     max_steps: int
     estimated_time_sec: int
+    # Capability requirements (migration To-do #2). Planner and AgentLoop
+    # read these via TaskContext instead of re-deriving them.
+    requires_llm: bool = False
+    requires_tool: bool = False
+    requires_planner: bool = False
+    confidence: float = 0.0
+    reasons: List[str] = field(default_factory=list)
 
 
 class CostEstimator:
@@ -75,4 +84,33 @@ class CostEstimator:
         }
 
     def estimate(self, ctx: TaskContext) -> ExecutionBudget:
-        return self.table.get(ctx.complexity, self.table["C1"])
+        base = self.table.get(ctx.complexity, self.table["C1"])
+        budget = ExecutionBudget(**base.__dict__)
+
+        # Deterministic capability requirements (To-do #2):
+        # - LLM planner is allowed only for C4/C5; C3 and below must use
+        #   the deterministic Fast Plan (rule-based) path.
+        # - tool/planner requirements follow from mode/complexity.
+        if ctx.mode.value == "AGENT" or ctx.complexity in {"C2", "C3", "C4", "C5"}:
+            budget.requires_tool = True
+            budget.requires_planner = True
+        if ctx.complexity in {"C4", "C5"}:
+            budget.requires_llm = True
+            budget.reasons.append(
+                f"{ctx.complexity}: deep plan — LLM planner allowed"
+            )
+        elif budget.requires_planner:
+            budget.reasons.append(
+                f"{ctx.complexity}: deterministic fast plan — LLM planner disabled"
+            )
+        budget.confidence = ctx.confidence
+
+        # Carry the requirements in TaskContext so Planner/AgentLoop read
+        # the budget from the context (single flow per CORE_MIGRATION.md).
+        ctx.budget_requires_llm = budget.requires_llm
+        ctx.budget_requires_tool = budget.requires_tool
+        ctx.budget_requires_planner = budget.requires_planner
+        ctx.budget_confidence = budget.confidence
+        ctx.budget_reasons = list(budget.reasons)
+
+        return budget
