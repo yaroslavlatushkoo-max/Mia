@@ -1,1 +1,177 @@
-(empty)
+# ============================================================
+# MIA — Git ignore
+# Source code and project architecture are tracked.
+# Runtime data, models, caches, local environments and binaries
+# are intentionally NOT tracked.
+# ============================================================
+
+# ------------------------------------------------------------
+# Python
+# ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ------------------------------------------------------------
+# Virtual environments
+# ------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ------------------------------------------------------------
+# Environment / secrets
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# ------------------------------------------------------------
+# AI / ML models and checkpoints
+# ------------------------------------------------------------
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.gguf
+*.ggml
+*.ckpt
+*.pkl
+*.joblib
+
+# Training checkpoints / generated models
+mia_lora/
+mia_lora_final/
+mia_merged/
+mia_model/
+
+# Local model directories
+models/
+model/
+checkpoints/
+
+# HuggingFace / Transformers caches
+.cache/
+.cache_huggingface/
+huggingface/
+transformers_cache/
+
+# ------------------------------------------------------------
+# Speech / TTS / STT models
+# ------------------------------------------------------------
+vosk-model/
+vosk-model-ru/
+
+voice_models/
+
+# Generated / cached voice audio
+voice_cache/
+cache/
+temp_voice/
+
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+
+# ------------------------------------------------------------
+# Runtime data
+# ------------------------------------------------------------
+data/memory_db/
+data/visual_memory/
+data/screenshots/
+data/cache/
+data/ai_cache.json
+
+# Chroma / vector DB
+**/chroma.sqlite3
+**/chroma.sqlite3-wal
+**/chroma.sqlite3-shm
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# ------------------------------------------------------------
+# Browser / driver binaries
+# ------------------------------------------------------------
+msedgedriver.exe
+chromedriver.exe
+geckodriver.exe
+
+# ------------------------------------------------------------
+# Temporary files
+# ------------------------------------------------------------
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.log
+
+temp/
+tmp/
+runtime/
+logs/
+
+# ------------------------------------------------------------
+# Generated reports / exports that are not source
+# ------------------------------------------------------------
+*.zip
+*.7z
+*.rar
+
+# ------------------------------------------------------------
+# OS
+# ------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# ------------------------------------------------------------
+# IDE
+# ------------------------------------------------------------
+.vscode/
+.idea/
+*.code-workspace
+
+# ------------------------------------------------------------
+# Local / experimental directories
+# ------------------------------------------------------------
+Driver_Notes/
+hron/
+
+# ------------------------------------------------------------
+# Nested repositories / local experiments
+# ------------------------------------------------------------
+temp_voice/
+
+# ------------------------------------------------------------
+# Generated Python executables / accidental command files
+# ------------------------------------------------------------
+python
+
+# Mia local runtime / personal state
+data/notes.json
+data/screen.png
+mia_memory/
+Modelfile
+# Accidental local files
+git reset
