@@ -340,5 +340,66 @@ else:
     check("open_app reports honest failure", r.verified is False)
 
 print()
+# ----------------------------------------------------------------------
+print("=== 7. Audit regressions: capability contract & selection ===")
+
+from mia.core.planner import Plan as P7, PlanStep as PS7
+
+# 7a. files.list accepts legacy 'directory' alias via registry contract
+r = reg.run("files.list", directory=".", limit=5)
+check("files.list(directory alias) works", r.success and "items" in r.data)
+
+# unknown params are dropped, not forwarded to executor (no lambda crash)
+r2 = reg.run("files.list", bogus_xyz="x")
+check("unknown param dropped cleanly", r2.success)
+
+# alias resolution keeps required-field validation honest
+r3 = reg.run("system.open_app", app="")
+check("empty required after alias -> validation error", not r3.success and "app_name" in (r3.error or ""))
+
+# 7b. OPEN_APPLICATION must select system tool, never browser search
+pl = Planner(tool_registry=reg)
+ctx_open = make_ctx(intent="OPEN_APPLICATION", raw="Открой блокнот")
+ctx_open.entities["app_name"] = "notepad"
+plan_rb = pl._rule_based_plan(ctx_open)
+check("rule-based OPEN_APPLICATION uses system.open_app",
+      plan_rb.steps[0].tool == "system.open_app")
+
+# LLM-style wrong decomposition (browser.open for an app) is repaired generally
+bad_llm = P7(goal="g", steps=[PS7(1, "search_app", "browser.open",
+               {"url": "https://www.google.com/search?q=calc"})])
+fixed = pl.validate_plan(bad_llm, ctx_open)
+check("validate_plan repairs browser.open->system.open_app",
+      fixed is not None and fixed.steps[0].tool == "system.open_app")
+check("repaired plan carries app name",
+      fixed.steps[0].input_data.get("app_name") == "notepad")
+
+# any remaining unknown tool invalidates the plan (fallback to rule-based)
+ghost_plan = P7(goal="g", steps=[PS7(1, "x", "ghost.tool", {})])
+check("unknown-tool plan rejected", pl.validate_plan(ghost_plan, ctx_open) is None)
+
+# WEB_SEARCH still legitimately uses browser.open (no over-repair)
+ctx_w = make_ctx(intent="WEB_SEARCH", raw="найди доки asyncio")
+w_plan = P7(goal="g", steps=[PS7(1, "s", "browser.open", {"url": "https://www.google.com/search?q=a"})])
+check("WEB_SEARCH browser.open untouched by repair",
+      pl.validate_plan(w_plan, ctx_w).steps[0].tool == "browser.open")
+
+# 7c. no false success when a registered tool actually fails
+class DeadPlanner(Planner):
+    def _rule_based_plan(self, ctx, level="fast"):
+        return P7(goal="g", steps=[PS7(1, "dead", "dead.tool", {})])
+
+dead_reg = ToolRegistry()
+dead_reg.register(ToolSpec(
+    name="dead.tool", description="always broken",
+    executor=lambda **kw: ToolResult(success=False, error="hardware missing", verified=False),
+))
+trace_d = ExecutionTrace(task_id="tdead", max_steps=5)
+loop_d = AgentLoop(dead_reg, DeadPlanner(tool_registry=dead_reg), policy=PolicyEngine(), max_replans=0)
+res_d = loop_d.run(make_ctx(), trace_d)
+check("broken tool -> verification failure", res_d["verification"]["success"] is False)
+check("broken tool -> failed status", trace_d.status == ExecutionStatus.FAILED)
+check("broken tool answer admits failure", "не смогла" in res_d["answer"])
+
 print(f"TOTAL: {PASS} passed, {FAIL} failed")
 raise SystemExit(1 if FAIL else 0)
