@@ -46,6 +46,11 @@ class ExecutionTrace:
     errors: List[str] = field(default_factory=list)
     artifacts: List[Dict[str, Any]] = field(default_factory=list)
 
+    # Replan history and last policy decision (CORE_MIGRATION.md §3:
+    # the trace records replan history; Policy must influence execution).
+    replans: List[Dict[str, Any]] = field(default_factory=list)
+    policy_decision: Any = None
+
     started_at: float = field(default_factory=time.time)
     finished_at: Optional[float] = None
 
@@ -95,7 +100,42 @@ class ExecutionTrace:
             ],
             "errors": self.errors,
             "artifacts": self.artifacts,
+            "replans": list(self.replans),
+            "policy_decision": (
+                self.policy_decision.to_dict()
+                if self.policy_decision is not None
+                else None
+            ),
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "final_answer": self.final_answer,
         }
+
+    # ------------------------------------------------------------------
+    # Observability helpers (CORE_MIGRATION.md §3: trace owns observations,
+    # errors and replan history; AgentLoop/Verification/Responder reuse them)
+    # ------------------------------------------------------------------
+    def record_observation(
+        self,
+        step: StepRecord,
+        observation: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+    ):
+        """Store the tool observation on the step and mirror it into trace-level
+        artifacts/errors so it survives beyond a single loop iteration."""
+        self.complete_step(step, observation=observation, error=error)
+        if observation is not None:
+            self.artifacts.append(
+                {
+                    "kind": "observation",
+                    "step_index": step.step_index,
+                    "tool": step.tool,
+                    "observation": observation,
+                }
+            )
+
+    def record_policy(self, decision):
+        self.policy_decision = decision
+
+    def record_replan(self, entry: Dict[str, Any]):
+        self.replans.append(entry)
