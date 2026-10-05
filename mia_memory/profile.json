@@ -1,0 +1,16 @@
+{
+  "user_id": "local_user",
+  "name": "",
+  "preferences": {},
+  "facts": {
+    "name": "Сергей"
+  },
+  "interests": [
+    "Unity",
+    "Python",
+    "Программирование"
+  ],
+  "projects": [
+    "Unity-разработка"
+  ]
+}

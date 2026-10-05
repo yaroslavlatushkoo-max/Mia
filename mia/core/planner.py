@@ -16,9 +16,33 @@ from .task_context import TaskContext
 # Intent -> default tool mapping for the deterministic rule-based path.
 INTENT_TOOL_MAP = {
     "OPEN_APPLICATION": "system.open_app",
+    "CLOSE_APPLICATION": "system.close_app",
     "WEB_SEARCH": "browser.open",
     "TECHNICAL_TASK": "files.list",
+    "FILE_LIST": "files.list",
+    "FILE_READ": "files.read",
+    "FILE_WRITE": "files.write",
+    "DELETE_FILES": "files.delete",
+    "RUN_SHELL": "shell.run",
+    "SCREENSHOT": "screen.screenshot",
 }
+
+
+def _search_url(query: str) -> str:
+    from urllib.parse import quote_plus
+
+    return "https://www.google.com/search?q=" + quote_plus(query.strip())
+
+
+def _rule_step(step_id: int, action: str, tool: str, input_data: Dict[str, Any]) -> PlanStep:
+    """Build a rule-based plan step with a readable description."""
+    return PlanStep(
+        step_id=step_id,
+        action=action,
+        tool=tool,
+        input_data=input_data,
+        description=action.replace("_", " "),
+    )
 
 
 @dataclass
@@ -93,9 +117,20 @@ class Planner:
     def create_plan(self, ctx: TaskContext) -> Plan:
         level = "deep" if ctx.complexity in {"C4", "C5"} else "fast"
 
-        if self.model_router:
+        # Budget-driven planning (To-do #2): the LLM planner is an
+        # enhancer allowed only for C4/C5 (budget.requires_llm). For C3
+        # and below the deterministic Fast Plan must be used — no LLM.
+        llm_allowed = getattr(ctx, "budget_requires_llm", None)
+        if llm_allowed is None:
+            # Context did not pass through CostEstimator: derive from
+            # complexity so the contract still holds.
+            llm_allowed = ctx.complexity in {"C4", "C5"}
+
+        if self.model_router and llm_allowed:
             llm_plan = self._try_llm_plan(ctx, level)
             if llm_plan and llm_plan.steps:
+                # C4/C5 JSON plan must be validated against ToolRegistry
+                # capabilities and tool input schemas before use.
                 validated = self.validate_plan(llm_plan, ctx)
                 if validated is not None:
                     validated.level = level
@@ -111,7 +146,10 @@ class Planner:
         capability-driven, not app-name hardcodes:
         - a step using browser.open to satisfy an OPEN_APPLICATION intent is
           rewritten to the registered system tool with the right parameter;
-        - any remaining unknown/unavailable tool invalidates the whole plan.
+        - any remaining unknown/unavailable tool invalidates the whole plan;
+        - every surviving step's input_data is checked against the tool's
+          input_schema via ToolSpec.validate_input (schema validation is
+          mandatory for C4/C5 LLM plans).
         """
         available = set(self.available_tools())
         system_tool = INTENT_TOOL_MAP.get("OPEN_APPLICATION")
@@ -135,6 +173,15 @@ class Planner:
         for step in plan.steps:
             if step.tool and step.tool not in available:
                 return None
+            # Schema-level validation against the registered tool contract.
+            if step.tool and self.tool_registry is not None:
+                spec = self.tool_registry.get(step.tool)
+                if spec is not None:
+                    normalized = spec.normalize_input(dict(step.input_data))
+                    err = spec.validate_input(normalized)
+                    if err:
+                        return None
+                    step.input_data = normalized
         return plan
 
     # ------------------------------------------------------------------
@@ -228,36 +275,92 @@ SUCCESS: <критерий успеха>"""
 
     # ------------------------------------------------------------------
     def _rule_based_plan(self, ctx: TaskContext, level: str = "fast") -> Plan:
-        if ctx.intent == "OPEN_APPLICATION":
-            app_name = ctx.entities.get("app_name", "")
+        intent = ctx.intent
+        ent = ctx.entities
+
+        if intent == "OPEN_APPLICATION":
+            app_name = ent.get("app_name", "")
             return Plan(
                 goal=f"Open application: {app_name or 'unknown'}",
-                steps=[PlanStep(
-                    step_id=1,
-                    action="open_application",
-                    tool="system.open_app",
-                    input_data={"app_name": app_name},
-                    description="Open requested application"
-                )],
+                steps=[_rule_step(1, "open_application", "system.open_app", {"app_name": app_name})],
                 success_criteria=["Application actually launched"],
                 level=level,
             )
 
-        if ctx.intent == "WEB_SEARCH":
+        if intent == "CLOSE_APPLICATION":
+            app_name = ent.get("app_name", "")
             return Plan(
-                goal=f"Search: {ctx.raw_input}",
-                steps=[PlanStep(
-                    step_id=1,
-                    action="open_search",
-                    tool="browser.open",
-                    input_data={"url": _search_url(ctx.raw_input)},
-                    description="Open search page"
-                )],
+                goal=f"Close application: {app_name or 'unknown'}",
+                steps=[_rule_step(1, "close_application", "system.close_app", {"app_name": app_name})],
+                success_criteria=["Application actually closed"],
+                level=level,
+            )
+
+        if intent == "WEB_SEARCH":
+            query = ent.get("query") or ctx.raw_input
+            return Plan(
+                goal=f"Search: {query}",
+                steps=[_rule_step(1, "open_search", "browser.open", {"url": _search_url(query)})],
                 success_criteria=["Search page opened"],
                 level=level,
             )
 
-        if ctx.intent == "TECHNICAL_TASK":
+        if intent == "FILE_LIST":
+            path = ent.get("path") or "."
+            return Plan(
+                goal=f"List files in: {path}",
+                steps=[_rule_step(1, "list_files", "files.list", {"path": path, "limit": 50})],
+                success_criteria=["Directory listed"],
+                level=level,
+            )
+
+        if intent == "FILE_READ":
+            path = ent.get("path") or ""
+            return Plan(
+                goal=f"Read file: {path or 'unknown'}",
+                steps=[_rule_step(1, "read_file", "files.read", {"path": path})],
+                success_criteria=["File content read"],
+                level=level,
+            )
+
+        if intent == "FILE_WRITE":
+            path = ent.get("path") or ""
+            content = ent.get("content", "")
+            return Plan(
+                goal=f"Write file: {path or 'unknown'}",
+                steps=[_rule_step(1, "write_file", "files.write", {"path": path, "content": content})],
+                success_criteria=["File written and confirmed"],
+                level=level,
+            )
+
+        if intent == "DELETE_FILES":
+            path = ent.get("path") or ""
+            return Plan(
+                goal=f"Delete: {path or 'unspecified'}",
+                steps=[_rule_step(1, "delete_file", "files.delete", {"path": path})],
+                success_criteria=["File actually removed (requires confirmation)"],
+                level=level,
+            )
+
+        if intent == "RUN_SHELL":
+            command = ent.get("command") or ""
+            return Plan(
+                goal=f"Run command: {command or 'unspecified'}",
+                steps=[_rule_step(1, "run_shell", "shell.run", {"command": command})],
+                success_criteria=["Command executed with exit code 0 (requires confirmation)"],
+                level=level,
+            )
+
+        if intent == "SCREENSHOT":
+            path = ent.get("path") or "screenshot.png"
+            return Plan(
+                goal="Take a screenshot",
+                steps=[_rule_step(1, "take_screenshot", "screen.screenshot", {"path": path})],
+                success_criteria=["Screenshot file saved"],
+                level=level,
+            )
+
+        if intent == "TECHNICAL_TASK":
             if level == "deep":
                 # Deep plan: inspect directory, then read the most
                 # relevant-looking file (deterministic skeleton; the LLM
@@ -265,17 +368,15 @@ SUCCESS: <критерий успеха>"""
                 return Plan(
                     goal=ctx.raw_input,
                     steps=[
-                        PlanStep(1, "inspect_directory", "files.list", {"path": ".", "limit": 30}),
-                        PlanStep(2, "read_key_file", "files.read", {"path": "./main.py"}),
+                        _rule_step(1, "inspect_directory", "files.list", {"path": ".", "limit": 30}),
+                        _rule_step(2, "read_key_file", "files.read", {"path": "./main.py"}),
                     ],
                     success_criteria=["Directory inspected", "Relevant file content read"],
                     level=level,
                 )
             return Plan(
                 goal=ctx.raw_input,
-                steps=[
-                    PlanStep(1, "inspect_directory", "files.list", {"path": ".", "limit": 30}),
-                ],
+                steps=[_rule_step(1, "inspect_directory", "files.list", {"path": ".", "limit": 30})],
                 success_criteria=["Directory inspected"],
                 level=level,
             )
