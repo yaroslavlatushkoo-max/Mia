@@ -61,6 +61,17 @@ def _search_url(query: str) -> str:
     return "https://www.google.com/search?q=" + quote_plus(query.strip())
 
 
+def _app_from_url(url: str) -> str:
+    """Best-effort app name extraction from a search URL the LLM produced."""
+    try:
+        from urllib.parse import urlparse, parse_qs, unquote
+
+        q = parse_qs(urlparse(url).query).get("q", [""])[0]
+        return unquote(q).strip()
+    except Exception:
+        return ""
+
+
 class Planner:
     def __init__(self, model_router=None, tool_registry=None):
         self.model_router = model_router
@@ -85,9 +96,46 @@ class Planner:
         if self.model_router:
             llm_plan = self._try_llm_plan(ctx, level)
             if llm_plan and llm_plan.steps:
-                llm_plan.level = level
-                return llm_plan
+                validated = self.validate_plan(llm_plan, ctx)
+                if validated is not None:
+                    validated.level = level
+                    return validated
         return self._rule_based_plan(ctx, level)
+
+    # ------------------------------------------------------------------
+    def validate_plan(self, plan: Plan, ctx: Optional[TaskContext] = None) -> Optional[Plan]:
+        """Validate an LLM-produced plan against ToolRegistry capabilities.
+
+        Returns the (possibly repaired) plan, or None when the plan must be
+        replaced by the deterministic rule-based fallback. Repair rules are
+        capability-driven, not app-name hardcodes:
+        - a step using browser.open to satisfy an OPEN_APPLICATION intent is
+          rewritten to the registered system tool with the right parameter;
+        - any remaining unknown/unavailable tool invalidates the whole plan.
+        """
+        available = set(self.available_tools())
+        system_tool = INTENT_TOOL_MAP.get("OPEN_APPLICATION")
+        usable_system = bool(system_tool) and system_tool in available
+
+        for step in plan.steps:
+            if step.tool == "browser.open" and ctx is not None \
+                    and ctx.intent == "OPEN_APPLICATION" and usable_system:
+                # Wrong decomposition: opening an application is a SYSTEM
+                # action, not a web search. Route it to the system tool.
+                app_name = (
+                    ctx.entities.get("app_name")
+                    or step.input_data.get("app_name")
+                    or _app_from_url(step.input_data.get("url", ""))
+                    or ctx.raw_input
+                )
+                step.tool = system_tool
+                step.action = step.action or "open_application"
+                step.input_data = {"app_name": app_name}
+
+        for step in plan.steps:
+            if step.tool and step.tool not in available:
+                return None
+        return plan
 
     # ------------------------------------------------------------------
     def _try_llm_plan(self, ctx: TaskContext, level: str) -> Optional[Plan]:
