@@ -1,0 +1,15 @@
+{"timestamp": 1791219423.7715523, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791219423.7743015, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791220666.7291763, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791220666.7311192, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791220666.8965266, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791220666.8990629, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791220666.9004598, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791220666.90159, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791221229.405271, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791221229.4072082, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791221229.5771585, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791221229.5785985, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791221229.5799766, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791221229.581102, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791221236.7369494, "event_type": "task", "content": "Task: открой блокнот", "importance": 3, "metadata": {}}

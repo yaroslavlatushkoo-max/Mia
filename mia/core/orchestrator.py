@@ -10,6 +10,7 @@ from .execution_trace import ExecutionTrace, ExecutionStatus
 from .agent_loop import AgentLoop
 from .planner import Planner
 from .verifier import Verifier
+from .responder import Responder
 
 from ..tools.registry import ToolRegistry
 from ..tools.builtin_tools import register_builtin_tools
@@ -29,6 +30,7 @@ class Orchestrator:
         agent_loop: Optional[AgentLoop] = None,
         model_router: Optional[ModelRouter] = None,
         memory: Optional[MemoryRetriever] = None,
+        responder: Optional[Responder] = None,
     ):
         self.router = router or Router()
         self.cost_estimator = cost_estimator or CostEstimator()
@@ -37,11 +39,20 @@ class Orchestrator:
         self.stylist = stylist or ResponseStylist()
         self.model_router = model_router or ModelRouter()
         self.memory = memory or MemoryRetriever()
+        self.responder = responder or Responder(stylist=self.stylist)
 
-        # Создаём planner и verifier с LLM
-        planner = Planner(model_router=self.model_router)
+        # Planner receives capabilities from the ToolRegistry — the single
+        # source of truth (CORE_MIGRATION.md §5). LLM is an enhancement;
+        # rule-based fallback stays working.
+        planner = Planner(model_router=self.model_router, tool_registry=self.tool_registry)
         verifier = Verifier(model_router=self.model_router)
-        self.agent_loop = agent_loop or AgentLoop(self.tool_registry, planner, verifier)
+        self.agent_loop = agent_loop or AgentLoop(
+            self.tool_registry,
+            planner,
+            verifier,
+            policy=self.policy,
+            responder=self.responder,
+        )
 
     def handle(self, user_input: str, source: str = "text") -> dict:
         ctx = self.router.route(user_input, source=source)
@@ -111,19 +122,27 @@ class Orchestrator:
         }
 
     def _direct_response(self, ctx: TaskContext) -> str:
+        # Direct path builds a factual answer first, then the Responder
+        # applies the character layer (reasoning and styling stay separate).
         if ctx.intent == "GREETING":
             local = self._try_local_answer(ctx, "Привет! Ответь коротко и тепло как Мия.")
-            return local or "Привет~ Мия на связи. Что будем делать сегодня?"
+            return self.responder.direct_response(
+                ctx, local or "Привет~ Мия на связи. Что будем делать сегодня?"
+            )
 
         if ctx.intent == "FAREWELL":
             local = self._try_local_answer(ctx, "Пользователь прощается. Ответь коротко и тепло.")
-            return local or "Пока~ Возвращайся, когда понадобится помощь. Мия будет на связи."
+            return self.responder.direct_response(
+                ctx, local or "Пока~ Возвращайся, когда понадобится помощь. Мия будет на связи."
+            )
 
         local = self._try_local_answer(ctx, ctx.raw_input)
         if local:
-            return local
+            return self.responder.direct_response(ctx, local)
 
-        return "Я поняла запрос. Скоро здесь будет полноценный ответ через локальную модель."
+        return self.responder.direct_response(
+            ctx, "Я поняла запрос. Скоро здесь будет полноценный ответ через локальную модель."
+        )
 
     def _try_local_answer(self, ctx: TaskContext, prompt: str) -> Optional[str]:
         try:
@@ -141,6 +160,6 @@ class Orchestrator:
             )
             if response.error:
                 return None
-            return self.stylist.style(response.text, ctx.mode.value)
+            return response.text
         except Exception:
             return None
