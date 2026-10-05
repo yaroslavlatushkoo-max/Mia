@@ -118,6 +118,20 @@ class PolicyEngine:
         )
         d.requires_confirmation = needs_confirm
 
+        # Session-level HITL resume: when the user has explicitly confirmed
+        # the pending task, PolicyDecision.confirmed carries it here. The
+        # gate below still evaluates every other rule (denied intents and
+        # any newly-detected higher risk stay blocking) — confirmation is
+        # consumed by Policy itself, never bypassed around it.
+        if getattr(ctx, "confirmed", False) and not d.confirmed:
+            d.confirmed = True
+
+        # Denied intents are terminal: confirmation cannot unlock them.
+        if ctx.intent in self.denied_intents:
+            d.allowed = False
+            d.reason = f"Intent denied by policy: {ctx.intent}"
+            return d
+
         # Confirmation is the gate: risky tools are blocked while unconfirmed,
         # but once the user has explicitly confirmed (d.confirmed=True) and no
         # other denial applies, execution is allowed. Weakening this branch

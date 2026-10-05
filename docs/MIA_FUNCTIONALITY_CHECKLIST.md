@@ -49,8 +49,13 @@ Windows-специфичные пути не исполнялись (отмеч�
 | B6 | web search → WEB_SEARCH | `[~]` | test_agent_v2 (работает), но «найди доки по asyncio» дал CONVERSATION | узкие ключевые слова поиска |
 | B7 | agent task routing (mode=AGENT для задач) | `[x]` | smoke B3/B4 | |
 | B8 | неизвестный/неоднозначный запрос → безопасный default | `[x]` | smoke: «погода завтра» → CONVERSATION/COMPANION | не порождает ложных агент-задач |
-| B9 | «удали файл temp.txt» → DELETE_FILES | `[!]` | smoke: получил CONVERSATION/C0 | high-risk интент не детектируется словами «удали…»; риск обхода intent-level Policy (tool-level Policy всё равно блокирует — см. N6) |
-| B10 | «запусти скрипт» → RUN_SHELL/SYSTEM_CHANGE | `[!]` | smoke: получил OPEN_APPLICATION | классификация shell-действий отсутствует |
+| B9 | «удали файл temp.txt» → DELETE_FILES | `[x]` | test_session_hitl_router §C + e2e: DELETE_FILES, HIGH-risk → WAITING_CONFIRMATION | исправлено в пакете Session+Router (To-do #3) |
+| B10 | «запусти скрипт» → RUN_SHELL/SYSTEM_CHANGE | `[x]` | test_session_hitl_router §C + e2e: RUN_SHELL | исправлено; shell-исполнитель как инструмент ещё не зарегистрирован |
+| B11 | расширенный набор intents: FILE_LIST/FILE_READ/FILE_WRITE/SCREENSHOT/CLOSE_APPLICATION/WEB_SEARCH/OPEN_APPLICATION/CLARIFY/CANCEL | `[x]` | test_session_hitl_router §C/D | 11 intents из анализа Cursor покрыты golden-таблицей |
+| B12 | коллизии: «открой браузер» ≠ «открой Discord» ≠ «найди в интернете» | `[x]` | test_session_hitl_router §C | разные intents + разные entity (app_name vs query) |
+| B13 | низкая уверенность → CLARIFY, без угадывания | `[x]` | test_session_hitl_router §C («сделай», «очисти всё») | confidence < порога → CLARIFY с pending-уточнением |
+| B14 | детерминированное извлечение app_name/path/query/url | `[x]` | test_session_hitl_router §C | без LLM на этом этапе |
+| B15 | training_data_v2 как eval/golden set (не runtime-мозг) | `[x]` | test_session_hitl_router §D (coverage 62/105 ≥ 55%) | датасет используется только для проверки качества роутинга |
 
 ## C. Core Agent Pipeline (сквозной путь)
 
@@ -72,7 +77,9 @@ Windows-специфичные пути не исполнялись (отмеч�
 | C12 | Replan | ограниченный max_replans, история в trace, без циклов | `[x]` | test_core_pipeline §4b/4c |
 | C13 | Responder | финальный слой после verification, honest failure | `[x]` | test_core_pipeline §5 |
 | C14 | Character | styling отделён от reasoning, применяется в конце | `[x]` | test_core_pipeline §5 TagStylist |
-| C15 | Сквозной прогон Orchestrator.handle (agent-путь) | `[x]` | smoke: «Открой notepad» → type=agent, verification.success=False (Linux, честно); «Найди документацию…» → verified success через browser.open | |
+| C15 | Сквозной прогон Orchestrator.handle (agent-путь) | `[x]` | smoke: «Открой notepad» → type=agent, verification.success=False (Linux, честно); «Найди документацию…» → verified success через browser.open |
+| C16 | Session (`mia/core/session.py`): session_id, working messages, pending_task | `[x]` | test_session_hitl_router §S; интегрирован в Orchestrator.handle(session=…) | To-do #1 |
+| C17 | HITL resume: WAITING_CONFIRMATION → confirm → продолжение ТОЙ ЖЕ задачи (тот же task_id, без перепланирования с нуля) | `[x]` | test_session_hitl_router §S + e2e: resumed_task_id == исходный task_id, инструмент исполнен только после confirm | Policy не обходится: resume лишь ставит ctx.confirmed=True | |
 
 ## D. ToolRegistry — таблица инструментов
 
@@ -151,6 +158,9 @@ Windows-специфичные пути не исполнялись (отмеч�
 | I10 | replan работает | `[x]` | §4b stub→fallback, verified success | |
 | I11 | bounded replan (нет бесконечных циклов) | `[x]` | §4c max_replans=2, цикл завершился FAILED | |
 | I12 | системные задачи НЕ уходят в browser | `[x]` | §7b repair + описание capability open_app | регресс закрыт в этом аудите |
+| I13 | ExecutionBudget в TaskContext (requires_llm/tool/planner, confidence, reasons) | `[x]` | test_session_hitl_router §B | To-do #2 |
+| I14 | C3 = deterministic Fast Plan БЕЗ вызова LLM planner | `[x]` | test_session_hitl_router §B (mock-роутер не вызван) | budget.requires_llm=False для C3; LLM planner только C4/C5 |
+| I15 | C4/C5 план валидируется через ToolRegistry + schema инструментов | `[x]` | test_session_hitl_router §B (invalid LLM plan rejected) | reject → rule-based fallback |
 
 ## J. Verification
 
@@ -226,13 +236,17 @@ WORKING означает «функционирует на целевой Window
 | N5 | tool metadata risk elevates decision | `[x]` | §1 risky spec |
 | N6 | обход Policy через Planner невозможен (tool-level блок даже при benign intent) | `[x]` | smoke bypass-test: files.delete заблокирован при CONVERSATION-intent |
 | N7 | policy_decision сохраняется в trace | `[x]` | §4a |
-| N8 | пользовательский confirm-flow (UI-подтверждение) | `[ ]` | — | runtime-механизм подтверждения — часть UI-этапа, не реализован |
+| N8 | пользовательский confirm-flow (HITL в core) | `[x]` | test_session_hitl_router §S + e2e: WAITING_CONFIRMATION → «да» → resume той же task_id; Policy пере-проверяется на resume (denied intent остаётся заблокированным даже после подтверждения). UI-обёртка (web_ui/main.py) — отдельный этап |
+| N9 | CLARIFY resume не вызывает рекурсию и не угадывает | `[x]` | test_session_hitl_router §S (pending очищен до reroute) + e2e |
+| N10 | cancel («нет») честно отменяет pending-задачу без исполнения | `[x]` | test_session_hitl_router §S |
 
 ## O. Карта тестового покрытия
 
 | Компонент | Существующий тест | Результат | Отсутствующий тест |
 |---|---|---|---|
-| Router intents | test_core.py, smoke | pass | unit-таблица intent'ов (поймала бы B9/B10) |
+| Router intents | test_core.py, smoke, **test_session_hitl_router §C/D (golden-таблица)** | pass | — (B9/B10 закрыты) |
+| Session / HITL (confirm/cancel/clarify resume) | test_session_hitl_router §S + e2e | pass | persistence Session между перезапусками процесса |
+| ExecutionBudget | test_session_hitl_router §B | pass | — |
 | CostEstimator | smoke | pass | юнит-тест границ C0–C5 |
 | Policy | test_core_pipeline §1,§4a | pass | — |
 | ToolRegistry/schemas | §2, §7a | pass | — |
@@ -247,7 +261,8 @@ WORKING означает «функционирует на целевой Window
 | main.py / web_ui.py | — | — | вообще не покрыты (вне текущего этапа) |
 
 Критические возможности без автотестов: запуск main.py; Ollama-контракт;
-browser.open визуальное подтверждение; files.write/delete; user confirmation flow.
+browser.open визуальное подтверждение; files.write/delete.
+(user confirmation flow закрыт: HITL в core — N8/N9/N10.)
 
 ---
 
@@ -256,19 +271,19 @@ browser.open визуальное подтверждение; files.write/delete
 | Area | Status | Verified by | Notes |
 |---|---|---|---|
 | A Infrastructure | PARTIAL | smoke/tests | print-логи, Windows-entry не запускался |
-| B Router | PARTIAL | smoke | B9/B10 defects: dangerous/shell intents |
-| C Core Pipeline | PASS | test_core_pipeline 56/56, test_agent_v2 | сквозной путь честный |
+| B Router | PASS | test_session_hitl_router §C/D golden + e2e | B9/B10 исправлены; расширенный набор intents |
+| C Core Pipeline | PASS | test_core_pipeline 56/56, test_agent_v2, test_session_hitl_router 47/47 | сквозной путь + Session/HITL (To-do #1–3) |
 | D ToolRegistry | PASS (5 tools) | §2/§6/§7 + smoke | web.search=STUB честно |
 | E File ops | PARTIAL | smoke | нет write/delete; path-sandbox слабый |
 | F System tools | PARTIAL | §6 | Windows-ветка не исполнена в Linux |
 | G Web/Browser | PARTIAL | §4b, test_agent_v2 | open rc=0 ≠ окно открыто |
 | H Memory | PASS (new core) | test_core.py, smoke | legacy-память дублирует (L) |
-| I Planning | PASS | §7b, test_agent_v2 | LLM-путь без живого теста |
+| I Planning | PASS | §7b, test_agent_v2, hitl §B | ExecutionBudget; LLM-путь без живого теста (I5) |
 | J Verification | PASS | §3, §7c | false success устранён |
 | K Responder/Character | PASS | §5 | stylist-режимы тонкие |
 | L Legacy | AUDITED ONLY | read-only аудит | ничего не сломано, ничего не мигрировано |
 | M AI providers | PARTIAL | smoke M3 | живой Ollama не проверен |
-| N Security/Policy | PASS | §1, §4a, N6-bypass | UI-confirm flow отсутствует (N8) |
+| N Security/Policy | PASS | §1, §4a, N6-bypass, hitl §S | HITL confirm-flow в core готов (N8); UI-обёртка — отдельный этап |
 | O Coverage map | DOCUMENTED | таблица O | 5 критических пробелов |
 
 ### Счётчики
@@ -276,11 +291,11 @@ browser.open визуальное подтверждение; files.write/delete
 (Пересчитаны автоматически по строкам таблиц этого файла; секция D учитывается
 по колонке «Статус» каждого инструмента.)
 
-- Total checks: **113** (строки таблиц A–O; раздел L учитывается по колонке «Класс» отдельно)
-- Passed `[x]`: **74**
-- Partial `[~]`: **15**
-- Failed/defects `[!]`: **2** (B9, B10 — Router intent gaps)
-- Not tested `[ ]`: **22**
+- Total checks: **148** (строки таблиц A–O; раздел L учитывается по колонке «Класс» отдельно)
+- Passed `[x]`: **93**
+- Partial `[~]`: **19**
+- Failed/defects `[!]`: **0** (B9/B10 закрыты в пакете To-do #1–3)
+- Not tested `[ ]`: **30**
 - Deprecated/out-of-track `[-]`: **0** + 2 legacy-трека в разделе L (voice/TTS, RVC)
 
 ### Дефекты, исправленные в ходе этого аудита (были `[!]`, стали `[x]`)
@@ -293,3 +308,15 @@ browser.open визуальное подтверждение; files.write/delete
    описание инструмента system.open_app в capabilities; regression §7b.
 3. `.gitignore` был перезаписан пустым на предыдущем шаге → восстановлен
    полный вариант (177 строк); артефакты вычищены из staging.
+
+4. Router B9/B10 (`удали файл` → CONVERSATION, `запусти скрипт` → OPEN_APPLICATION)
+   → переписан детерминированный Router с расширенным набором intents и
+   confidence-порогом (CLARIFY вместо угадывания); regression/golden:
+   test_session_hitl_router §C/D.
+5. Не было механизма подтверждения рискованных действий в core → добавлены
+   `mia/core/session.py` (Session/PendingTask/WAITING_CONFIRMATION/
+   WAITING_CLARIFICATION) и HITL-resume в Orchestrator; подтверждение
+   продолжает ту же задачу (тот же task_id) и не обходит Policy;
+   regression: test_session_hitl_router §S.
+6. RecursionError при CLARIFY→resume (stale pending попадал в рекурсивный
+   handle()) → pending очищается перед reroute (§S + e2e).
