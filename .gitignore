@@ -1,3 +1,7 @@
-# Git bundles and patches (typically used for sharing history, not part of source control)
+# Compiled/Bytecode files
+__pycache__/
+*.pyc
+
+# Git bundles and patches (often generated for transfer/review)
 *.bundle
 *.patch
