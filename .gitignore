@@ -1,5 +1,5 @@
-﻿# ============================================================
-# MIA тАФ Git ignore
+# ============================================================
+# MIA — Git ignore
 # Source code and project architecture are tracked.
 # Runtime data, models, caches, local environments and binaries
 # are intentionally NOT tracked.
@@ -137,6 +137,10 @@ logs/
 *.7z
 *.rar
 
+# Git bundles and patches (typically used for sharing history, not part of source control)
+*.bundle
+*.patch
+
 # ------------------------------------------------------------
 # OS
 # ------------------------------------------------------------
@@ -173,5 +177,6 @@ data/notes.json
 data/screen.png
 mia_memory/
 Modelfile
+
 # Accidental local files
 git reset
