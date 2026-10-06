@@ -109,4 +109,71 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
         )
     )
 
+    # ------------------------------------------------------------------
+    # Task 5: honest contract-only tools. Registered with schema, risk and
+    # confirmation semantics, but WITHOUT an executor: the Registry then
+    # returns Observation.status == NOT_IMPLEMENTED instead of fake success.
+    # Real executors arrive only together with sandbox + Policy/HITL wiring.
+    # ------------------------------------------------------------------
+    registry.register(
+        ToolSpec(
+            name="files.write",
+            description="Write text content to a file (requires sandboxed path).",
+            risk="high",
+            requires_confirmation=True,
+            status="ADAPTER",
+            side_effects=["filesystem.write"],
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                    "append": {"type": "boolean", "default": False},
+                },
+                "required": ["path", "content"],
+            },
+            aliases={"path": ["file", "file_path"]},
+            executor=None,  # NOT_IMPLEMENTED — no fake executor
+        )
+    )
+
+    registry.register(
+        ToolSpec(
+            name="files.delete",
+            description="Delete a file by path.",
+            risk="high",
+            requires_confirmation=True,
+            status="ADAPTER",
+            side_effects=["filesystem.delete"],
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+            aliases={"path": ["file", "file_path"]},
+            executor=None,  # NOT_IMPLEMENTED — destructive, needs HITL+executor
+        )
+    )
+
+    registry.register(
+        ToolSpec(
+            name="shell.safe_run",
+            description="Run a whitelisted shell command safely.",
+            risk="high",
+            requires_confirmation=True,
+            status="ADAPTER",
+            side_effects=["process.spawn"],
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string"},
+                    "cwd": {"type": "string"},
+                },
+                "required": ["command"],
+            },
+            aliases={"command": ["cmd", "script"]},
+            executor=None,  # NOT_IMPLEMENTED — must not bypass Policy
+        )
+    )
+
     return registry

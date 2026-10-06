@@ -384,22 +384,49 @@ SUCCESS: <критерий успеха>"""
         return Plan(goal=ctx.raw_input, steps=[], success_criteria=[], level=level)
 
     # ------------------------------------------------------------------
-    def replan(self, ctx: TaskContext, failed_plan: Plan, error: str) -> Plan:
+    def replan(self, ctx: TaskContext, failed_plan: Plan, error: str,
+               previous_observation: Optional[Dict[str, Any]] = None) -> Plan:
         """Produce an alternative plan after a failure (bounded use).
 
         Strategy: drop steps that failed for known reasons and substitute
         a capability-backed alternative when possible.
+
+        Task 6: `previous_observation` is the compact structured context of
+        the LAST execution attempt (status/summary/error — see Observation.
+        to_step_context / AgentLoop._context_from_record). It genuinely
+        influences the decision: when the last attempt was NOT_IMPLEMENTED
+        or TIMEOUT, keeping the very same failing step is pointless — such
+        steps are dropped in favour of an alternative-capability plan.
+        Legacy positional callers keep working (the parameter is optional).
         """
         available = set(self.available_tools())
         new_steps: List[PlanStep] = []
+
+        prev_status = ""
+        if isinstance(previous_observation, dict):
+            prev_status = str(previous_observation.get("status") or "").upper()
+        # Evidence-driven pruning: never re-plan the identical action that
+        # just proved unavailable/unresponsive.
+        prune_failed_step = prev_status in ("NOT_IMPLEMENTED", "TIMEOUT")
+        failed_tool = ""
+        failed_action = ""
+        if prune_failed_step and isinstance(previous_observation, dict):
+            failed_tool = previous_observation.get("tool") or ""
+            failed_action = ""
 
         for step in failed_plan.steps:
             keep = True
             replacement: Optional[PlanStep] = None
 
+            if prune_failed_step and (
+                (failed_tool and step.tool == failed_tool)
+                or (not failed_tool and step is failed_plan.steps[0])
+            ):
+                keep = False
+
             # web.search is a stub at this migration stage — replace it
             # with browser.open Google search when that capability exists.
-            if step.tool == "web.search" and "stub" in error.lower():
+            if step.tool == "web.search" and ("stub" in error.lower() or prev_status in ("NOT_IMPLEMENTED", "FAILURE")):
                 if "browser.open" in available:
                     replacement = PlanStep(
                         step_id=len(new_steps) + 1,
