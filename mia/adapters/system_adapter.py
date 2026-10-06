@@ -63,14 +63,32 @@ class SystemAdapter:
 
     # ------------------------------------------------------------------
     def _launch(self, target: str, app_name: str) -> ToolResult:
-        """Launch a resolved target; verify honestly that it started."""
+        """Launch a resolved target; verify honestly that it started.
+
+        Task 6 honesty rule: SUCCESS/verified=True is reported ONLY when the
+        launch actually happened on this machine — i.e. we are really running
+        on Windows (checked via ``sys.platform``, not merely a monkeypatched
+        ``platform.system`` label) AND the OS accepted the launch request
+        without raising. On any other platform, or when the launch mechanism
+        is unavailable/fails, the result is an honest FAILURE — never fake
+        SUCCESS (contract §7 of CORE_MIGRATION.md).
+        """
         import platform
+        import sys as _sys
 
         candidate = Path(target)
         try:
-            if platform.system() == "Windows":
+            if _sys.platform == "win32" and platform.system() == "Windows":
+                startfile = getattr(os, "startfile", None)
+                if startfile is None:
+                    return ToolResult(
+                        success=False,
+                        error="os.startfile unavailable on this interpreter; cannot open apps",
+                        verified=False,
+                        data={"reason": "UNSUPPORTED_OS"},
+                    )
                 if candidate.exists() or target.endswith((".lnk", ".url")):
-                    os.startfile(str(target))
+                    startfile(str(target))
                     return ToolResult(
                         success=True,
                         data={
