@@ -96,7 +96,7 @@ if __name__ == "__main__":
     d = obs.to_dict()
     check("to_dict has all keys", set(d) == {"tool","status","summary","stdout","stderr","duration","metadata"})
     check("statuses enum complete", {s.value for s in ObservationStatus} ==
-          {"SUCCESS","FAILURE","TIMEOUT","NOT_IMPLEMENTED","BLOCKED","CANCELLED"})
+          {"SUCCESS","FAILURE","TIMEOUT","NOT_IMPLEMENTED","BLOCKED","CANCELLED","REJECTED"})
 
     # duration measured for real
     slow_reg = ToolRegistry()
@@ -238,16 +238,43 @@ if __name__ == "__main__":
     check("open_app via registry returns Observation", isinstance(ropen, Observation))
     check("on Linux env open_app never reports fake SUCCESS", not ropen.success)
 
-    print("=== 7. files.write / files.delete / shell.safe_run -> NOT_IMPLEMENTED ===")
+    print("=== 7. files.write / files.delete / shell.safe_run: sandbox + HITL honesty ===")
+    # Contract history: at Task 5 these tools were REGISTERED-but-NOT_IMPLEMENTED.
+    # Now they have REAL executors, but safety must be provably unchanged:
+    # unconfirmed calls stay BLOCKED (executor never invoked), confirmed calls
+    # execute ONLY inside the configured sandbox.
+    import tempfile as _tf
+    from pathlib import Path as _P
+    from mia.tools.sandbox import PathSandbox as _PS
+    _ws = _P(_tf.mkdtemp(prefix="mia-ws-")); _mem = _P(_tf.mkdtemp(prefix="mia-mem-"))
+    _sb_reg = register_builtin_tools(ToolRegistry(), sandbox=_PS(_ws, memory_dir=_mem))
+    pol7 = PolicyEngine()
     for tname in ("files.write", "files.delete", "shell.safe_run"):
-        check(f"{tname} registered", full_reg.is_registered(tname))
-        check(f"{tname} NOT implemented (no executor)", not full_reg.is_implemented(tname))
-        spec = full_reg.get(tname)
+        check(f"{tname} registered", _sb_reg.is_registered(tname))
+        check(f"{tname} now implemented (real executor)", _sb_reg.is_implemented(tname))
+        spec = _sb_reg.get(tname)
         check(f"{tname} high-risk + confirmation contract",
               spec.risk == "high" and spec.requires_confirmation)
-        out = full_reg.run(tname, **({"path": "a.txt", "content": "x"} if "files" in tname else {"command": "dir"}))
-        check(f"{tname} runtime -> NOT_IMPLEMENTED", out.status == ObservationStatus.NOT_IMPLEMENTED)
-        check(f"{tname} NOT_IMPLEMENTED never success", not out.success)
+        payload = ({"path": "a.txt", "content": "x"} if "files" in tname else {"command": "echo hi"})
+        blocked = _sb_reg.run(tname, policy=pol7,
+                              ctx=make_ctx(intent="DELETE_FILES", risk="high"), **payload)
+        check(f"{tname} UNCONFIRMED -> BLOCKED (HITL not bypassed)",
+              blocked.status == ObservationStatus.BLOCKED and not blocked.executed)
+        ok_ctx = make_ctx(intent="DELETE_FILES", risk="high", confirmed=True)
+        done = _sb_reg.run(tname, policy=pol7, ctx=ok_ctx, **payload)
+        check(f"{tname} CONFIRMED -> executed inside sandbox",
+              done.status in (ObservationStatus.SUCCESS, ObservationStatus.FAILURE) and done.executed)
+    # write+delete roundtrip with verification hints
+    wobs = _sb_reg.run("files.write", policy=pol7,
+                       ctx=make_ctx(risk="high", confirmed=True),
+                       path="note.txt", content="hello sandbox")
+    check("files.write SUCCESS on disk", wobs.status == ObservationStatus.SUCCESS)
+    check("files.write effect verified", (_ws / "note.txt").read_text(encoding="utf-8") == "hello sandbox")
+    dabs = _sb_reg.run("files.delete", policy=pol7,
+                       ctx=make_ctx(risk="high", confirmed=True), path="note.txt")
+    check("files.delete SUCCESS removes file", dabs.status == ObservationStatus.SUCCESS
+          and not ( _ws / "note.txt").exists())
+    _sb_reg.shutdown(wait=False)
 
     print("=== 8. Policy gate BEFORE executor (defense-in-depth in Registry) ===")
     executed_flag = []

@@ -4,3 +4,70 @@
 {"timestamp": 1791281112.8451142, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
 {"timestamp": 1791281159.4053142, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
 {"timestamp": 1791281159.4084115, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791543298.1032913, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791543298.1059904, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791543298.4439356, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791543298.446449, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791543301.9067895, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791543301.90951, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791543301.9109495, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791543301.9139209, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791637314.8522432, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791637314.854291, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791637314.8799891, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791637314.883706, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791637314.8860707, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791637314.8889308, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791637325.5127885, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791637325.5152256, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791637325.8414996, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791637325.8437881, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791637327.5569992, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791637327.559654, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791637327.561141, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791637327.5632386, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791637366.2955682, "event_type": "task", "content": "Task: найди в интернете кота", "importance": 3, "metadata": {}}
+{"timestamp": 1791637366.3125637, "event_type": "task", "content": "Task: открой блокнот", "importance": 3, "metadata": {}}
+{"timestamp": 1791637394.8815215, "event_type": "task", "content": "Task: покажи файлы в папке docs", "importance": 3, "metadata": {}}
+{"timestamp": 1791637394.8833668, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791637398.1395907, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791637444.7331483, "event_type": "task", "content": "Task: найди в интернете кота", "importance": 3, "metadata": {}}
+{"timestamp": 1791638817.163574, "event_type": "task", "content": "Task: покажи файлы в папке docs", "importance": 3, "metadata": {}}
+{"timestamp": 1791638822.3051639, "event_type": "task", "content": "Task: покажи файлы в папке docs", "importance": 3, "metadata": {}}
+{"timestamp": 1791638823.1414454, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791638823.1439312, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791638832.446773, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791638832.4492176, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791638832.64432, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791638832.6477199, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791638832.6493275, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791638832.6514082, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791639225.5319283, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791639225.534678, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791639227.2802505, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791639227.2826564, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791639277.8915155, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791639277.8943775, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791639279.5935957, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791639279.5958204, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791639279.7975423, "event_type": "task", "content": "Task: покажи файлы в папке docs", "importance": 3, "metadata": {}}
+{"timestamp": 1791639831.053593, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791639831.058281, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791639831.2560606, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791639831.2583482, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791639836.0630264, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791639836.0685415, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791639837.932501, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791639837.9353204, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791639837.937197, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791639837.9392724, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791640324.5508003, "event_type": "conversation", "content": "Меня зовут Сергей, я работаю с Unity", "importance": 2, "metadata": {}}
+{"timestamp": 1791640324.5562255, "event_type": "conversation", "content": "Я люблю программировать на Python", "importance": 2, "metadata": {}}
+{"timestamp": 1791640324.768256, "event_type": "task", "content": "Task: Открой notepad", "importance": 3, "metadata": {}}
+{"timestamp": 1791640324.7710924, "event_type": "task", "content": "Task: Найди документацию Python по asyncio", "importance": 3, "metadata": {}}
+{"timestamp": 1791640324.7730074, "event_type": "task", "content": "Task: Проверь папку с проектом", "importance": 3, "metadata": {}}
+{"timestamp": 1791640324.7750633, "event_type": "task", "content": "Task: Создай план изучения Unity для начинающего", "importance": 3, "metadata": {}}
+{"timestamp": 1791642038.2063818, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791642038.2116027, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
+{"timestamp": 1791655865.5917306, "event_type": "task", "content": "Confirmed task: удали файл temp.txt", "importance": 4, "metadata": {}}
+{"timestamp": 1791655865.5954003, "event_type": "task", "content": "Task: сделай покажи файлы в папке data", "importance": 3, "metadata": {}}
