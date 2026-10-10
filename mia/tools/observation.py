@@ -33,6 +33,8 @@ class ObservationStatus(str, Enum):
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
     BLOCKED = "BLOCKED"
     CANCELLED = "CANCELLED"
+    #: вход не прошёл валидацию схемы — executor НЕ вызывался
+    REJECTED = "REJECTED"
 
 
 @dataclass

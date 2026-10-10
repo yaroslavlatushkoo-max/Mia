@@ -1,3 +1,15 @@
+"""Демо-прогон ядра: маршрутизация и планы для типовых запросов.
+
+Изоляция от пользовательских данных: процесс работает во временном каталоге и
+явно задаёт MIA_MEMORY_DIR (через mia.config), поэтому реальные
+mia_memory/profile.json и episodes.jsonl не изменяются.
+"""
+import os
+import tempfile
+
+_TMP = tempfile.mkdtemp(prefix="mia_test_agent_")
+os.environ["MIA_MEMORY_DIR"] = os.path.join(_TMP, "memory")
+
 from mia.core.orchestrator import Orchestrator
 
 orch = Orchestrator()
@@ -30,3 +42,9 @@ for text in tests:
 
     if result.get("replans"):
         print("Replans:", result["replans"])
+
+print("\n(хранилище этого прогона: %s — временное, пользовательские данные не тронуты)"
+      % os.environ["MIA_MEMORY_DIR"])
+
+import shutil
+shutil.rmtree(_TMP, ignore_errors=True)
