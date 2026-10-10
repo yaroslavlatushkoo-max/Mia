@@ -331,6 +331,25 @@ class Router:
         return None
 
     def _extract_folder(self, text: str) -> Optional[str]:
+        # 1) Явный путь (абсолютный POSIX/Windows или относительный с /):
+        #    'в папке /nonexistent_dir_zzz_42', 'в C:/Users/me/Documents'.
+        m = re.search(
+            r"(?:в|из)\s+(?:папке|папку|каталоге|директории)\s+"
+            r"([~.]?/?[\w.\-]+(?:/[^\s\"'«»,.!?;:]+)*|[a-zA-Z]:[\\/][^\s\"'«»,.!?;:]+)",
+            text,
+        )
+        if m:
+            return m.group(1).rstrip("\\/.")
+        # 1b) Windows-путь с обратными слэшами: 'в папке C:\Users\me\Docs'.
+        #     Предыдущий шаблон съедал только диск ('C') — дефект B14.
+        m = re.search(
+            r"(?:в|из)\s+(?:папке|папку|каталоге|директории)\s+"
+            r"([a-zA-Z]:\\[^\s\"'«»]+)",
+            text,
+        )
+        if m:
+            return m.group(1).rstrip("\\/")
+        # 2) Просто имя папки без слэшей ('в папке docs').
         m = re.search(r"(?:в|из)\s+(?:папке|папку|каталоге|директории)\s+([\w\-.]+)", text)
         if m:
             return m.group(1)

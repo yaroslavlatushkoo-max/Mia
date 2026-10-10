@@ -1,20 +1,43 @@
 from __future__ import annotations
 
 from typing import List, Dict, Any, Optional
+from pathlib import Path
 import re
 
+from ..config import default_memory_dir
 from .working_memory import WorkingMemory
 from .profile_memory import ProfileMemory
 from .episodic_memory import EpisodicMemory
 
 
 class MemoryRetriever:
-    """Единая точка доступа к памяти."""
+    """Единая точка доступа к памяти.
 
-    def __init__(self):
+    memory_dir — явный каталог хранилища (из MiaSettings/конфигурации).
+    Если не задан, используется безопасный default из mia.config
+    (независимый от CWD запускателя). Обратная совместимость: старый вызов
+    MemoryRetriever() без аргументов сохраняет поведение.
+    """
+
+    def __init__(self, memory_dir: Optional[Path] = None):
+        self.memory_dir = Path(memory_dir) if memory_dir is not None else default_memory_dir()
         self.working = WorkingMemory()
-        self.profile = ProfileMemory()
-        self.episodic = EpisodicMemory()
+        self.profile = ProfileMemory(memory_dir=self.memory_dir)
+        self.episodic = EpisodicMemory(memory_dir=self.memory_dir)
+
+    def set_storage(self, memory_dir: Path | str) -> None:
+        """Явно перенаправить хранилище (конфигурация/тесты).
+
+        Подхватывает уже загруженные profile/episodic-объекты — иначе
+        внешний код (например, Orchestrator), держащий ссылку на память,
+        продолжил бы писать в старое (пользовательское) хранилище.
+        Формат файлов не меняется; запись возможна только внутри нового
+        каталога.
+        """
+        self.memory_dir = Path(memory_dir)
+        for store in (self.profile, self.episodic):
+            store.storage_path = self.memory_dir / store.storage_path.name
+            store._load() if hasattr(store, "_load") else None
 
     def get_context_for_query(self, query: str, max_items: int = 5) -> Dict[str, Any]:
         context = {
@@ -89,16 +112,35 @@ class MemoryRetriever:
         )
 
     def _extract_name(self, text: str) -> Optional[str]:
+        # Многосоставные имена сохраняются ЦЕЛИКОМ — усечение до первого
+        # слова теряло фамилию/отчество. Части имени: слово с заглавной
+        # буквы, опционально составное через дефис ('Пушкин-Тестовский').
+        part = r"[А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)*"
         patterns = [
-            r"меня зовут\s+([А-ЯЁ][а-яё]+)",
-            r"моё имя\s+([А-ЯЁ][а-яё]+)",
-            r"мое имя\s+([А-ЯЁ][а-яё]+)",
-            r"я\s+([А-ЯЁ][а-яё]+)\s*$",
+            rf"меня зовут\s+({part}(?:\s+{part})*)",
+            rf"моё имя\s+({part}(?:\s+{part})*)",
+            rf"мое имя\s+({part}(?:\s+{part})*)",
+            rf"я\s+({part}(?:\s+{part})*)\s*$",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return match.group(1).capitalize()
+                name = " ".join(match.group(1).split())
+                return self._normalize_name(name)
 
         return None
+
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        """Каждое слово с заглавной буквы, составные части через дефис
+        ('иванов-петров' -> 'Иванов-Петров'). Не capitalize(): он бы
+        превращал 'Тестовый Пользователь' в 'Тестовый пользователь'."""
+        parts = []
+        for word in name.split():
+            hyphenated = "-".join(
+                p[:1].upper() + p[1:].lower() if p else ""
+                for p in word.split("-")
+            )
+            parts.append(hyphenated)
+        return " ".join(parts)

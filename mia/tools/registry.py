@@ -159,7 +159,7 @@ class ToolRegistry:
         if validation_error:
             return self.compressor.compress(Observation(
                 tool=name,
-                status=ObservationStatus.FAILURE,
+                status=ObservationStatus.REJECTED,
                 summary=validation_error,
                 stderr=validation_error,
                 duration=round(time.monotonic() - started, 6),
