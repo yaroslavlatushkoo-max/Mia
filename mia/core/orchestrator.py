@@ -40,6 +40,10 @@ class Orchestrator:
         self.tool_registry = tool_registry or register_builtin_tools(ToolRegistry())
         self.stylist = stylist or ResponseStylist()
         self.model_router = model_router or ModelRouter()
+        # Память явно привязана к конфигурации: Orchestrator(memory=...) —
+        # приоритет вызывающего кода; иначе безопасный default из mia.config
+        # (НЕ зависит от CWD запуска, не пишет молча в пользовательское
+        # хранилище из тестов/временных экземпляров).
         self.memory = memory or MemoryRetriever()
         self.responder = responder or Responder(stylist=self.stylist)
         # Session + HITL (To-do #1): working state and at most one pending

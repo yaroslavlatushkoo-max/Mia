@@ -7,11 +7,28 @@ from ..adapters.web_adapter import WebAdapter
 
 from .registry import ToolRegistry
 from .schemas import ToolSpec
+from ..adapters.shell_adapter import ShellAdapter
 
 
-def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
+def register_builtin_tools(
+    registry: ToolRegistry,
+    sandbox=None,
+) -> ToolRegistry:
+    """Register the built-in tool set.
+
+    ``sandbox`` (mia.tools.sandbox.PathSandbox) — единый настроенный рабочий
+    каталог для файловых операций и shell.safe_run. Если он не передан,
+    создаётся песочница по умолчанию из MiaSettings (каталог mia_workspace/,
+    не зависит от CWD): файлы вне границы не читаются, не пишутся и не
+    удаляются никогда. Обратная совместимость сигнатуры сохранена.
+    """
+    if sandbox is None:
+        from ..config import MiaSettings
+        sandbox = MiaSettings.from_env().build_sandbox()
+
     system = SystemAdapter()
-    files = FileAdapter()
+    files = FileAdapter(sandbox=sandbox)
+    shell = ShellAdapter(sandbox=sandbox)
     browser = BrowserAdapter()
     web = WebAdapter()
 
@@ -110,18 +127,23 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
     )
 
     # ------------------------------------------------------------------
-    # Task 5: honest contract-only tools. Registered with schema, risk and
-    # confirmation semantics, but WITHOUT an executor: the Registry then
-    # returns Observation.status == NOT_IMPLEMENTED instead of fake success.
-    # Real executors arrive only together with sandbox + Policy/HITL wiring.
+    # Task: safe tool execution — files.write / files.delete / shell.safe_run
+    # получили РЕАЛЬНЫЕ executor-ы, но только внутри PathSandbox (единый
+    # настроенный рабочий каталог) и только через существующий HITL-механизм:
+    # requires_confirmation=True + risk="high" по-прежнему оценивает
+    # PolicyEngine.check_tool до любого вызова executor'а. Без подтверждения
+    # операция не выполняется (Registry/AgentLoop блокируют на входе).
     # ------------------------------------------------------------------
     registry.register(
         ToolSpec(
             name="files.write",
-            description="Write text content to a file (requires sandboxed path).",
+            description=(
+                "Write text content to a file inside the configured Mia "
+                "workspace directory (sandboxed; paths outside are refused)."
+            ),
             risk="high",
             requires_confirmation=True,
-            status="ADAPTER",
+            status="REAL",
             side_effects=["filesystem.write"],
             input_schema={
                 "type": "object",
@@ -133,17 +155,21 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
                 "required": ["path", "content"],
             },
             aliases={"path": ["file", "file_path"]},
-            executor=None,  # NOT_IMPLEMENTED — no fake executor
+            executor=lambda path, content, append=False: files.write_file(
+                path, content, bool(append)),
         )
     )
 
     registry.register(
         ToolSpec(
             name="files.delete",
-            description="Delete a file by path.",
+            description=(
+                "Delete a single file inside the configured Mia workspace "
+                "directory (sandboxed; directories and external paths refuse)."
+            ),
             risk="high",
             requires_confirmation=True,
-            status="ADAPTER",
+            status="REAL",
             side_effects=["filesystem.delete"],
             input_schema={
                 "type": "object",
@@ -151,18 +177,23 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
                 "required": ["path"],
             },
             aliases={"path": ["file", "file_path"]},
-            executor=None,  # NOT_IMPLEMENTED — destructive, needs HITL+executor
+            executor=lambda path: files.delete_file(path),
         )
     )
 
     registry.register(
         ToolSpec(
             name="shell.safe_run",
-            description="Run a whitelisted shell command safely.",
+            description=(
+                "Run an allowlisted command (echo/dir/ls/pwd/python...) with "
+                "no shell interpreter, sandbox cwd, timeout and output cap. "
+                "Arbitrary execution is forbidden."
+            ),
             risk="high",
             requires_confirmation=True,
-            status="ADAPTER",
+            status="REAL",
             side_effects=["process.spawn"],
+            timeout=20,
             input_schema={
                 "type": "object",
                 "properties": {
@@ -172,7 +203,7 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
                 "required": ["command"],
             },
             aliases={"command": ["cmd", "script"]},
-            executor=None,  # NOT_IMPLEMENTED — must not bypass Policy
+            executor=lambda command, cwd=None: shell.run(command, cwd),
         )
     )
 
