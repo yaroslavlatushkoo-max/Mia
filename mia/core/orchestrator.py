@@ -16,6 +16,7 @@ from .session import Session, PendingTask, PendingState
 from ..tools.registry import ToolRegistry
 from ..tools.builtin_tools import register_builtin_tools
 from ..character.response_stylist import ResponseStylist
+from ..character.quick_responses import quick_response
 from ..ai.model_router import ModelRouter
 from ..memory.memory_retriever import MemoryRetriever
 
@@ -328,26 +329,21 @@ class Orchestrator:
         return result
 
     def _direct_response(self, ctx: TaskContext) -> str:
-        # Direct path builds a factual answer first, then the Responder
-        # applies the character layer (reasoning and styling stay separate).
-        if ctx.intent == "GREETING":
-            local = self._try_local_answer(ctx, "Привет! Ответь коротко и тепло как Мия.")
-            return self.responder.direct_response(
-                ctx, local or "Привет~ Мия на связи. Что будем делать сегодня?"
-            )
-
-        if ctx.intent == "FAREWELL":
-            local = self._try_local_answer(ctx, "Пользователь прощается. Ответь коротко и тепло.")
-            return self.responder.direct_response(
-                ctx, local or "Пока~ Возвращайся, когда понадобится помощь. Мия будет на связи."
-            )
+        # Fast canned replies and simple arithmetic bypass Ollama.
+        quick = quick_response(ctx.intent, ctx.raw_input)
+        if quick is not None:
+            return self.responder.direct_response(ctx, quick)
 
         local = self._try_local_answer(ctx, ctx.raw_input)
         if local:
             return self.responder.direct_response(ctx, local)
 
         return self.responder.direct_response(
-            ctx, "Я поняла запрос. Скоро здесь будет полноценный ответ через локальную модель."
+            ctx,
+            "\u042f \u043f\u043e\u043d\u044f\u043b\u0430 \u0437\u0430\u043f\u0440\u043e\u0441, "
+            "\u043d\u043e \u0441\u0435\u0439\u0447\u0430\u0441 \u043d\u0435 \u0441\u043c\u043e\u0433\u043b\u0430 "
+            "\u043f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u0438\u0442\u044c \u043e\u0442\u0432\u0435\u0442 "
+            "\u0447\u0435\u0440\u0435\u0437 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u0443\u044e \u043c\u043e\u0434\u0435\u043b\u044c."
         )
 
     def _try_local_answer(self, ctx: TaskContext, prompt: str) -> Optional[str]:
