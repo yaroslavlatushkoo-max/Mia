@@ -1,3 +1,4 @@
+import os
 # ========== ОСНОВНЫЕ НАСТРОЙКИ ==========
 ASSISTANT_NAME = "мия"
 ASSISTANT_ALIASES = [
@@ -17,7 +18,7 @@ WAKE_WORD_SENSITIVITY = 0.5
 # ========== ИИ-МОЗГИ ==========
 AI_ENABLED = False
 AI_PROVIDER = "openrouter"
-AI_API_KEY = "[REDACTED_OPENROUTER_KEY]"
+AI_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 AI_MODEL = "gpt-3.5-turbo"
 
 # ========== ВСЕ ПРОГРАММЫ И ИГРЫ ==========

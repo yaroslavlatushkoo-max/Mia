@@ -8,7 +8,7 @@ import ollama
 class AIBrainSkill:
     def __init__(self, speech, config=None):
         self.speech = speech
-        self.api_key = "[REDACTED_OPENROUTER_KEY]"
+        self.api_key = os.getenv("OPENROUTER_API_KEY", "")
         self.model = "anthropic/claude-3-haiku"
         self.local_model = "mia-enhanced"  # Qwen 7B + лисья личность
         self.history = []
@@ -58,6 +58,9 @@ class AIBrainSkill:
     
     def ask_claude(self, question):
         """Быстрый ответ через Claude с принудительной ролью Мии"""
+        if not self.api_key:
+            print("[Mia] OPENROUTER_API_KEY is not configured; remote request skipped.")
+            return None
         messages = []
         
         messages.append({

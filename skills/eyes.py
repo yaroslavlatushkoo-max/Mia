@@ -10,7 +10,7 @@ class EyesSkill:
     def __init__(self, speech):
         self.speech = speech
         self.screen_path = os.path.join(os.path.dirname(__file__), "..", "data", "screen.png")
-        self.api_key = "[REDACTED_OPENROUTER_KEY]"
+        self.api_key = os.getenv("OPENROUTER_API_KEY", "")
         self.model = "anthropic/claude-3-haiku"  # Быстрый и понимает изображения
     
     def see_screen(self):
@@ -26,6 +26,9 @@ class EyesSkill:
     
     def analyze_with_ai(self, question="Опиши кратко что на экране, на русском"):
         """Анализ экрана через Claude (OpenRouter)"""
+        if not self.api_key:
+            self.speech.speak("OpenRouter is not configured; screen analysis is unavailable.")
+            return ""
         self.speech.speak("Смотрю...")
         
         try:
@@ -68,6 +71,9 @@ class EyesSkill:
     
     def find_element(self, description):
         """Найти элемент на экране по описанию и кликнуть"""
+        if not self.api_key:
+            self.speech.speak("OpenRouter is not configured; element search is unavailable.")
+            return False
         self.speech.speak(f"Ищу {description}...")
         
         try:

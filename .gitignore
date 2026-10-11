@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+
+# Local Mia data and temporary third-party projects
+mia_memory/
+temp_voice/
+.gitignore.backup_20261010_222109

@@ -13,7 +13,7 @@ class LiveObserver:
     def __init__(self, speech):
         self.speech = speech
         self.observing = False
-        self.api_key = "[REDACTED_OPENROUTER_KEY]"
+        self.api_key = os.getenv("OPENROUTER_API_KEY", "")
         
         # Папки
         self.data_dir = os.path.join(os.path.dirname(__file__), "..", "data", "visual_memory")
@@ -36,6 +36,9 @@ class LiveObserver:
     def _auto_start(self):
         """Автозапуск наблюдения"""
         time.sleep(5)
+        if not self.api_key:
+            print("[EYE] OPENROUTER_API_KEY is not configured; automatic observation disabled.")
+            return
         self.start_observing(interval=15)
     
     def _load_memory(self):
@@ -61,6 +64,8 @@ class LiveObserver:
     
     def _analyze_with_claude(self, image_b64):
         """Отправить скриншот Claude и получить описание"""
+        if not self.api_key:
+            return None
         try:
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
